@@ -1,0 +1,28 @@
+---
+# Mirror of amun-kubernetes/inventory/rpids.yml. Kept duplicated (not symlinked)
+# so this repo is independently deployable.
+all:
+  vars:
+    ansible_user: gonzalo
+    ansible_ssh_private_key_file: ~/.ssh/gonzalo_main_private_key.pem
+    local_kubeconfig: "{{ lookup('env', 'HOME') }}/.kube/config-rpid"
+    k3s_init_host: rpid0.lan
+  children:
+    k3s_servers:
+      hosts:
+        # Control-plane nodes do NOT host Longhorn replicas — they're tainted
+        # NoSchedule and Longhorn CSI doesn't tolerate that. 4 storage nodes
+        # (rpid3-rpid6) is enough for 3-replica with anti-affinity.
+        rpid0.lan: { subnet_zone: net-10-1-1, longhorn_storage: false }
+        rpid1.lan: { subnet_zone: net-10-1-1, longhorn_storage: false }
+        rpid2.lan: { subnet_zone: net-10-1-1, longhorn_storage: false }
+    k3s_agents:
+      hosts:
+        rpid3.lan:  { subnet_zone: net-10-0-0, longhorn_storage: true }
+        rpid4.lan:  { subnet_zone: net-10-0-0, longhorn_storage: true }
+        rpid5.lan:  { subnet_zone: net-10-0-0, longhorn_storage: true }
+        rpid6.lan:  { subnet_zone: net-10-0-0, longhorn_storage: true }
+        rpid7.lan:  { subnet_zone: net-10-1-1, longhorn_storage: false }
+        rpid8.lan:  { subnet_zone: net-10-1-1, longhorn_storage: false }
+        rpid9.lan:  { subnet_zone: net-10-0-0, longhorn_storage: false }
+        rpid10.lan: { subnet_zone: net-10-0-0, longhorn_storage: false }

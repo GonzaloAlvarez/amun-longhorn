@@ -1,0 +1,6 @@
+---
+longhorn_namespace: longhorn-system
+longhorn_storage_path: /var/lib/longhorn
+longhorn_default_replicas: 3
+longhorn_chart_version: 1.7.2
+longhorn_phase: host_prereqs   # 'host_prereqs' or 'in_cluster' — set in main.yml

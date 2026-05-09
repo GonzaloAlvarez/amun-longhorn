@@ -1,0 +1,8 @@
+---
+- name: Run host prereqs (per-node, become=true)
+  ansible.builtin.import_tasks: prereqs.yml
+  when: longhorn_phase == 'host_prereqs'
+
+- name: Install Longhorn (run from localhost)
+  ansible.builtin.import_tasks: helm.yml
+  when: longhorn_phase == 'in_cluster'

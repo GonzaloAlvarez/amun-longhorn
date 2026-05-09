@@ -1,0 +1,14 @@
+---
+galaxy_info:
+  author: Gonzalo Alvarez
+  description: Longhorn distributed block storage for amun-kubernetes
+  license: GPL-3.0
+  min_ansible_version: "2.15"
+  platforms:
+    - name: Debian
+      versions: [trixie]
+  galaxy_tags:
+    - storage
+    - kubernetes
+    - longhorn
+dependencies: []

@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# amun-longhorn/test — local syntax check.
+set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+cd "$SCRIPT_DIR"
+
+if [[ "$OSTYPE" == darwin* ]]; then
+    VENV="${HOME}/Library/Application Support/amun/.venv"
+else
+    VENV="${HOME}/.local/share/amun/.venv"
+fi
+
+ANSIBLE_PB="${VENV}/bin/ansible-playbook"
+"${ANSIBLE_PB}" --syntax-check main.yml
+echo "✓ syntax check passed"

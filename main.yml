@@ -1,0 +1,16 @@
+---
+- name: Longhorn host prerequisites
+  hosts: k3s_servers:k3s_agents
+  become: true
+  gather_facts: true
+  roles:
+    - role: longhorn
+
+- name: Install Longhorn into the cluster
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  roles:
+    - role: longhorn
+      vars:
+        longhorn_phase: in_cluster

@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+# amun-longhorn/deploy — install Longhorn (prereqs + HelmChart) on the cluster.
+# Idempotent. Re-run any time.
+
+set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+cd "$SCRIPT_DIR"
+
+if [[ "$OSTYPE" == darwin* ]]; then
+    VENV="${HOME}/Library/Application Support/amun/.venv"
+else
+    VENV="${HOME}/.local/share/amun/.venv"
+fi
+
+if [[ ! -x "${VENV}/bin/python" ]]; then
+    echo "!! venv at ${VENV} not found — run amun-kubernetes/deploy first." >&2
+    exit 1
+fi
+
+ANSIBLE="${VENV}/bin/ansible-playbook"
+ANSIBLE_GALAXY="${VENV}/bin/ansible-galaxy"
+
+if [[ ! -x "${ANSIBLE}" ]]; then
+    echo "!! ansible-playbook not found — run amun-kubernetes/deploy first to set up the venv." >&2
+    exit 1
+fi
+
+# kubeconfig sanity check
+KUBECONFIG_PATH="${HOME}/.kube/config-rpid"
+if [[ ! -f "${KUBECONFIG_PATH}" ]]; then
+    echo "!! kubeconfig at ${KUBECONFIG_PATH} not found — run amun-kubernetes/deploy first." >&2
+    exit 1
+fi
+
+echo ">> installing Ansible Galaxy collections"
+"${ANSIBLE_GALAXY}" collection install -r requirements.yml >/dev/null
+
+echo ">> running playbook"
+"${ANSIBLE}" main.yml "$@"
+
+echo
+echo "✓ Longhorn deployed. Check status:"
+echo "    kubectl -n longhorn-system get nodes.longhorn.io -o wide"
+echo "    kubectl -n longhorn-system get volumes"

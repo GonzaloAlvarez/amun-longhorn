@@ -1,0 +1,15 @@
+# local state
+.ansible-facts/
+*.retry
+galaxy_roles/
+collections/
+
+# python
+__pycache__/
+*.pyc
+
+# editor
+.idea/
+.vscode/
+*.swp
+.DS_Store

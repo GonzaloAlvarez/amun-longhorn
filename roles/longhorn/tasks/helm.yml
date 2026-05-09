@@ -1,0 +1,105 @@
+---
+# Use the k3s in-cluster Helm controller (HelmChart CRD) so we don't need helm
+# CLI on the laptop. The controller resolves and applies the chart.
+
+- name: Apply Longhorn HelmChart CRD
+  kubernetes.core.k8s:
+    kubeconfig: "{{ local_kubeconfig }}"
+    state: present
+    definition:
+      apiVersion: helm.cattle.io/v1
+      kind: HelmChart
+      metadata:
+        name: longhorn
+        namespace: kube-system
+      spec:
+        chart: longhorn
+        repo: https://charts.longhorn.io
+        version: "{{ longhorn_chart_version }}"
+        targetNamespace: "{{ longhorn_namespace }}"
+        createNamespace: true
+        valuesContent: |-
+          defaultSettings:
+            defaultDataPath: "{{ longhorn_storage_path }}"
+            defaultReplicaCount: {{ longhorn_default_replicas }}
+            createDefaultDiskLabeledNodes: true
+            # Soft anti-affinity: prefer different nodes/zones per replica, but
+            # allow co-location when there aren't enough distinct ones. With
+            # all storage workers in a single L2 zone (net-10-0-0), strict
+            # zone-anti-affinity blocks 3-replica scheduling outright.
+            replicaSoftAntiAffinity: true
+            replicaZoneSoftAntiAffinity: true
+            storageOverProvisioningPercentage: 100
+            storageMinimalAvailablePercentage: 10
+          persistence:
+            defaultClass: true
+            defaultClassReplicaCount: {{ longhorn_default_replicas }}
+            reclaimPolicy: Retain
+          longhornUI:
+            replicas: 1
+          # No control-plane toleration — Longhorn's CSI plugin and engine-image
+          # DaemonSets don't ship with one either, so any pod scheduled on a
+          # control-plane node can't attach Longhorn PVCs. Storage stays on
+          # workers (rpid3-rpid10).
+          longhornManager: {}
+
+- name: Wait for Longhorn manager DaemonSet to roll out
+  kubernetes.core.k8s_info:
+    kubeconfig: "{{ local_kubeconfig }}"
+    api_version: apps/v1
+    kind: DaemonSet
+    namespace: "{{ longhorn_namespace }}"
+    name: longhorn-manager
+  register: lh_ds
+  until: (lh_ds.resources | length > 0) and (lh_ds.resources[0].status.numberReady | default(0) | int >= 1)
+  retries: 90
+  delay: 10
+
+- name: Wait for default StorageClass to be created
+  kubernetes.core.k8s_info:
+    kubeconfig: "{{ local_kubeconfig }}"
+    api_version: storage.k8s.io/v1
+    kind: StorageClass
+    name: longhorn
+  register: sc
+  until: sc.resources | length > 0
+  retries: 30
+  delay: 5
+
+- name: Label storage nodes for Longhorn
+  kubernetes.core.k8s:
+    kubeconfig: "{{ local_kubeconfig }}"
+    state: patched
+    kind: Node
+    name: "{{ item.split('.')[0] }}"
+    definition:
+      metadata:
+        labels:
+          node.longhorn.io/create-default-disk: "true"
+  loop: "{{ groups['k3s_servers'] + groups['k3s_agents'] }}"
+  when: hostvars[item].longhorn_storage | default(false)
+
+- name: Patch the longhorn StorageClass to ensure {{ longhorn_default_replicas }} replicas
+  kubernetes.core.k8s:
+    kubeconfig: "{{ local_kubeconfig }}"
+    state: patched
+    api_version: storage.k8s.io/v1
+    kind: StorageClass
+    name: longhorn
+    definition:
+      parameters:
+        numberOfReplicas: "{{ longhorn_default_replicas | string }}"
+        staleReplicaTimeout: "30"
+
+- name: Show Longhorn manager pods
+  kubernetes.core.k8s_info:
+    kubeconfig: "{{ local_kubeconfig }}"
+    api_version: v1
+    kind: Pod
+    namespace: "{{ longhorn_namespace }}"
+    label_selectors:
+      - app=longhorn-manager
+  register: lh_pods
+
+- ansible.builtin.debug:
+    msg: "Longhorn ready: {{ lh_pods.resources | length }} manager pods running"

@@ -1,0 +1,39 @@
+---
+# Longhorn manager runs as a DaemonSet on ALL nodes; every node needs
+# iscsiadm to be installed or the manager pod crashes with
+# "please make sure you have iscsiadm/open-iscsi installed on the host".
+# So apt + iscsid are unconditional. Only the data dir is storage-only.
+
+- name: Install Longhorn host requirements (all nodes — managers run everywhere)
+  ansible.builtin.apt:
+    name:
+      - open-iscsi
+      - nfs-common
+      - util-linux
+      - jq
+      - cryptsetup     # Longhorn warns "Missing packages" without it (used for encrypted volumes)
+    state: present
+    update_cache: true
+    cache_valid_time: 600
+
+- name: Enable iscsid (all nodes)
+  ansible.builtin.systemd:
+    name: iscsid
+    enabled: true
+    state: started
+
+- name: Load iscsi_tcp module persistently (all nodes)
+  ansible.builtin.copy:
+    dest: /etc/modules-load.d/longhorn.conf
+    content: |
+      iscsi_tcp
+    mode: "0644"
+
+- name: Ensure Longhorn data dir exists (storage-eligible nodes only)
+  ansible.builtin.file:
+    path: "{{ longhorn_storage_path }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when: longhorn_storage | default(false)
