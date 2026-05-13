@@ -42,7 +42,11 @@ kubectl -n longhorn-system get volumes \
 kubectl -n longhorn-system get nodes.longhorn.io \
   -o custom-columns='NAME:.metadata.name,SCHEDULABLE:.spec.allowScheduling,READY:.status.conditions[?(@.type=="Ready")].status'
 
-# UI
+# UI — exposed via dual ingress (no auth; trust boundary = LAN + tailnet)
+open http://longhorn.k8s.lan/        # from LAN
+open https://longhorn.lab.gn.al/     # from a tailnet device
+
+# UI — fallback via port-forward (if ingress is down)
 kubectl -n longhorn-system port-forward svc/longhorn-frontend 8000:80
 open http://localhost:8000
 ```
