@@ -104,11 +104,16 @@
 - ansible.builtin.debug:
     msg: "Longhorn ready: {{ lh_pods.resources | length }} manager pods running"
 
-# Expose the Longhorn UI via the same dual-ingress pattern as cn-* apps.
-# WARNING: Longhorn UI has no built-in authentication — anyone reaching either
-# host can read or destroy volumes. Acceptable in the homelab threat model
-# (LAN + tailnet both trust-boundary'd to the operator); add basic auth or
-# Authentik forward-auth if that ever stops being true.
+# Expose the Longhorn UI via the same dual-ingress pattern as cn-* apps,
+# gated by nginx-ingress basic auth (the longhorn-ui-auth sealed Secret
+# holds the htpasswd). Swap basic-auth annotations for Authentik forward-auth
+# when Authentik lands.
+- name: Apply sealed Secret for Longhorn UI basic auth
+  kubernetes.core.k8s:
+    kubeconfig: "{{ local_kubeconfig }}"
+    state: present
+    definition: "{{ lookup('file', 'sealed-secret-ui-auth.yaml') | from_yaml }}"
+
 - name: Expose Longhorn UI via LAN ingress (longhorn.k8s.lan)
   kubernetes.core.k8s:
     kubeconfig: "{{ local_kubeconfig }}"
@@ -122,6 +127,9 @@
         annotations:
           coredns.io/hostname: longhorn.k8s.lan
           nginx.ingress.kubernetes.io/ssl-redirect: "false"
+          nginx.ingress.kubernetes.io/auth-type: basic
+          nginx.ingress.kubernetes.io/auth-secret: longhorn-ui-auth
+          nginx.ingress.kubernetes.io/auth-realm: "Longhorn UI"
       spec:
         ingressClassName: nginx
         rules:
@@ -148,6 +156,9 @@
         namespace: "{{ longhorn_namespace }}"
         annotations:
           nginx.ingress.kubernetes.io/ssl-redirect: "false"
+          nginx.ingress.kubernetes.io/auth-type: basic
+          nginx.ingress.kubernetes.io/auth-secret: longhorn-ui-auth
+          nginx.ingress.kubernetes.io/auth-realm: "Longhorn UI"
       spec:
         ingressClassName: nginx
         rules:
