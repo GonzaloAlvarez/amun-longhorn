@@ -105,14 +105,18 @@
     msg: "Longhorn ready: {{ lh_pods.resources | length }} manager pods running"
 
 # Expose the Longhorn UI via the same dual-ingress pattern as cn-* apps,
-# gated by nginx-ingress basic auth (the longhorn-ui-auth sealed Secret
-# holds the htpasswd). Swap basic-auth annotations for Authentik forward-auth
-# when Authentik lands.
-- name: Apply sealed Secret for Longhorn UI basic auth
-  kubernetes.core.k8s:
-    kubeconfig: "{{ local_kubeconfig }}"
-    state: present
-    definition: "{{ lookup('file', 'sealed-secret-ui-auth.yaml') | from_yaml }}"
+# gated by nginx-ingress basic auth (the longhorn-ui-auth Secret holds the
+# htpasswd). The htpasswd is Kauket-managed (k8s.longhorn_ui_auth_env,
+# profile role.k8s_admin); apply-secrets.sh materializes the Secret from the
+# Kauket-installed env file. Swap basic-auth annotations for Authentik
+# forward-auth when Authentik lands.
+- name: Materialize longhorn-ui-auth Secret from Kauket
+  ansible.builtin.command:
+    cmd: "{{ role_path }}/files/apply-secrets.sh"
+  environment:
+    KUBECONFIG: "{{ local_kubeconfig }}"
+    LONGHORN_NAMESPACE: "{{ longhorn_namespace }}"
+  changed_when: true
 
 # ── Authentik outpost Services pointing at neptune-hosted outposts ───────
 #
